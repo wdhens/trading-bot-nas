@@ -4,7 +4,7 @@
 Separate from the trading bot on purpose: own folder, own Task Scheduler task, own update
 file. Nothing here touches the trading bot, and the bot's updater never touches this.
 
-Run by the DSM task "pay-server" every 10 minutes (as admin, the user the server runs as):
+Run by the DSM task "pay-server" every 5 minutes (10 also works) (as admin, the user the server runs as):
   * if the server does not answer on /health, (re)start it,
   * once a day (11:xx UTC) look for a new version in
     https://raw.githubusercontent.com/wdhens/trading-bot-nas/main/pay-server/latest.json.
@@ -45,6 +45,8 @@ URL = os.environ.get("PAY_UPDATE_URL",
                      "https://raw.githubusercontent.com/wdhens/trading-bot-nas/main/pay-server/latest.json")
 UPDATE_HOUR = int(os.environ.get("PAY_UPDATE_HOUR", "11"))
 PY = sys.executable or "python3"
+TICK_MIN = int(os.environ.get("PAY_TICK_MIN", "5"))  # how often DSM runs this task (for the uptime %)
+HISTORY = os.path.join(D, "pay-stats-history.jsonl")
 
 
 def log(msg):
@@ -133,10 +135,19 @@ def stop_live():
     try:
         out = subprocess.run(["pgrep", "-f", "nas_pay_server.py"], stdout=subprocess.PIPE,
                              universal_newlines=True).stdout
-        pids.update(int(x) for x in out.split())
+        for x in out.split():
+            try:  # only real python processes running the server file, never shells or editors
+                with open("/proc/{}/cmdline".format(x), "rb") as f:
+                    argv = [a.decode("utf-8", "replace") for a in f.read().split(b"\0") if a]
+            except OSError:
+                continue
+            if argv and "python" in os.path.basename(argv[0]) and \
+                    any(a.endswith("nas_pay_server.py") and "pay-update" not in a for a in argv[1:3]):
+                pids.add(int(x))
     except (OSError, ValueError):
         pass
     pids.discard(os.getpid())
+    pids.discard(os.getppid())
     for pid in pids:
         try:
             os.kill(pid, signal.SIGTERM)
@@ -254,6 +265,32 @@ def listing_check():
     return "listing check: {} OK, {} FAIL{}".format(ok, len(bad), ("; " + " | ".join(bad[:3])) if bad else "")
 
 
+def uptime_note(st, ok, now):
+    """Share of ticks in the last 30 days where the server answered (missed ticks = NAS off)."""
+    days = st.setdefault("uptime", {})
+    today = now.date().isoformat()
+    days[today] = days.get(today, 0) + (1 if ok else 0)
+    for k in sorted(days)[:-30]:
+        del days[k]
+    first = st.setdefault("uptime_since", now.isoformat())
+    start = max(dt.datetime.fromisoformat(first), now - dt.timedelta(days=30))
+    expected = max(1, int((now - start).total_seconds() // (TICK_MIN * 60)) + 1)
+    return min(100.0, round(100.0 * sum(days.values()) / expected, 1))
+
+
+def stats_note(st, today):
+    code, _, body = get("http://127.0.0.1:{}/v1/stats".format(PORT))
+    if code != 200:
+        return ""
+    s = json.loads(body)
+    if st.get("last_history") != today:
+        st["last_history"] = today
+        with open(HISTORY, "a") as f:
+            f.write(json.dumps({"date": today, "stats": s}, separators=(",", ":")) + "\n")
+    return "verkopen: {} (${:.2f}) van {} betalers".format(
+        s.get("sales_total", 0), s.get("usdc_total", 0.0), s.get("unique_payers", 0))
+
+
 def main():
     st = load_state()
     now = dt.datetime.now(dt.timezone.utc)
@@ -274,6 +311,7 @@ def main():
             msg = "update check failed: {}".format(str(e)[:200])
         log(msg)
         lines.append(msg)
+        st["last_update_msg"] = msg
         try:
             msg = listing_check()
         except Exception as e:
@@ -281,11 +319,19 @@ def main():
         log(msg)
         lines.append(msg)
         st["last_listing"] = msg
-    save_state(st)
     h = health(PORT)
-    if lines or not h:
-        status(lines + ["nu: " + ("online, versie {}".format(h.get("version")) if h else "OFFLINE"),
-                        st.get("last_listing", "")])
+    up = uptime_note(st, bool(h), now)
+    try:
+        sales = stats_note(st, today)
+    except Exception as e:
+        sales = "verkopen: onbekend ({})".format(str(e)[:80])
+    save_state(st)
+    if lines or not h or now.minute < TICK_MIN:
+        last = st.get("last_update_msg", "")
+        out = [x for x in lines if x != last] + [last,
+               "nu: " + ("online, versie {}".format(h.get("version")) if h else "OFFLINE"),
+               "bereikbaar (30 dagen): {}%".format(up), sales, st.get("last_listing", "")]
+        status([x for x in out if x])
 
 
 if __name__ == "__main__":
