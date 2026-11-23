@@ -81,6 +81,11 @@ EVM_RPC = os.getenv("EVM_RPC_URL", "https://eth.llamarpc.com")
 BASE_RPC = os.getenv("BASE_RPC_URL", "https://mainnet.base.org")
 SUI_RPC = os.getenv("SUI_RPC_URL", "https://fullnode.mainnet.sui.io:443")
 LIGHTER_API = os.getenv("LIGHTER_API", "https://mainnet.zklighter.elliot.ai/api/v1").rstrip("/")
+# The trading bot uses Lighter from the same home IP. Keep this server well below any rate limit and stay
+# out of the way while the bot trades: at most LIGHTER_MAX_PER_MIN requests per minute, and no Lighter calls
+# during the quiet windows (UTC "HH:MM-HH:MM", comma separated; default covers the 00:10 and the 21:10/20:10 runs).
+LIGHTER_MAX_PER_MIN = int(os.getenv("LIGHTER_MAX_PER_MIN", "20"))
+LIGHTER_QUIET = os.getenv("LIGHTER_QUIET_UTC", "00:05-00:30,20:05-21:30")
 MEMPOOL_API = os.getenv("MEMPOOL_API", "https://mempool.space/api").rstrip("/")
 COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY", "")  # optional free "demo" key
 
@@ -113,6 +118,42 @@ def _http_get_json(url: str, timeout: int = 8, headers: Optional[Dict[str, str]]
     req = urllib.request.Request(url, headers=h, method="GET")
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
+
+
+_LIGHTER_STAMPS: List[float] = []
+_LIGHTER_LOCK = threading.Lock()
+
+
+def lighter_quiet_now(now: Optional[float] = None) -> bool:
+    t = time.gmtime(now if now is not None else time.time())
+    cur = t.tm_hour * 60 + t.tm_min
+    for part in LIGHTER_QUIET.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            a, b = part.split("-")
+            a_m = int(a[:2]) * 60 + int(a[3:5])
+            b_m = int(b[:2]) * 60 + int(b[3:5])
+        except (ValueError, IndexError):
+            continue
+        if a_m <= cur < b_m:
+            return True
+    return False
+
+
+def _lighter_get(path: str, timeout: int = 8) -> Any:
+    """Lighter public API read, under the request budget and outside the bot's quiet windows."""
+    if lighter_quiet_now():
+        raise RuntimeError("Lighter reads paused while the trading bot runs; retry in a few minutes")
+    now = time.time()
+    with _LIGHTER_LOCK:
+        while _LIGHTER_STAMPS and now - _LIGHTER_STAMPS[0] > 60:
+            _LIGHTER_STAMPS.pop(0)
+        if len(_LIGHTER_STAMPS) >= LIGHTER_MAX_PER_MIN:
+            raise RuntimeError("Lighter request budget used up for this minute; retry shortly")
+        _LIGHTER_STAMPS.append(now)
+    return _http_get_json(LIGHTER_API + path, timeout=timeout)
 
 
 def _http_post(url: str, body: Dict, timeout: int = 10,
@@ -1005,7 +1046,7 @@ def build_regime() -> Dict:
 
 # ── Lighter (zk perp DEX): funding vs CEXs and market stats, incl. US stock/ETF perps ──
 def build_lighter_funding() -> Dict:
-    raw = _http_get_json(LIGHTER_API + "/funding-rates", timeout=10)
+    raw = _lighter_get("/funding-rates", timeout=10)
     by: Dict[str, Dict[str, float]] = {}
     for r in raw.get("funding_rates") or []:
         rate = _f(r.get("rate"))
@@ -1029,7 +1070,7 @@ def build_lighter_funding() -> Dict:
 
 
 def build_lighter_markets() -> Dict:
-    raw = _http_get_json(LIGHTER_API + "/orderBookDetails?filter=perp", timeout=12)
+    raw = _lighter_get("/orderBookDetails?filter=perp", timeout=12)
     rows = []
     for m in raw.get("order_book_details") or []:
         if m.get("status") != "active":
@@ -1116,7 +1157,7 @@ def book_metrics(bids: List[Tuple[float, float]], asks: List[Tuple[float, float]
 
 
 def _lighter_book(market_id: int) -> Optional[Dict[str, Any]]:
-    raw = _http_get_json("{}/orderBookOrders?market_id={}&limit={}".format(LIGHTER_API, market_id, DEPTH_LEVELS), timeout=8)
+    raw = _lighter_get("/orderBookOrders?market_id={}&limit={}".format(market_id, DEPTH_LEVELS), timeout=8)
 
     def agg(rows: List[Dict], reverse: bool) -> List[Tuple[float, float]]:
         by: Dict[float, float] = {}
@@ -1139,7 +1180,7 @@ def _hl_book(coin: str) -> Optional[Dict[str, Any]]:
 
 
 def build_lighter_depth() -> Dict:
-    raw = _http_get_json(LIGHTER_API + "/orderBookDetails?filter=perp", timeout=10)
+    raw = _lighter_get("/orderBookDetails?filter=perp", timeout=10)
     mk = [m for m in (raw.get("order_book_details") or []) if m.get("status") == "active"]
     mk.sort(key=lambda m: -(_f(m.get("daily_quote_token_volume")) or 0))
     top = mk[:DEPTH_MARKETS]
@@ -1170,7 +1211,8 @@ def build_lighter_depth() -> Dict:
     return {"feed": "lighter_depth", "venues": ["lighter", "hyperliquid"], "notionals_usd": list(DEPTH_NOTIONALS),
             "markets": rows, "errors": errs or None,
             "note": ("Slippage_bps = average fill vs best price for a market order of that size, from the visible book "
-                     "(Lighter: top %d orders per side; Hyperliquid: top 20 levels). null = the visible book cannot fill "
+                     "(Lighter: top %d orders per side; Hyperliquid: top 20 levels). Slippage is measured against the best price on the "
+                     "side you trade; add half the spread to get it versus the mid price. null = the visible book cannot fill "
                      "that size; depth_usd_within_* = null when the visible book does not reach that far (see visible_range_bps). Indicative only, not a guaranteed execution price. Hyperliquid is shown only where the "
                      "same coin trades there." % DEPTH_LEVELS)}
 
@@ -1246,8 +1288,8 @@ def build_crowding() -> Dict:
     scored = [a["score"] for a in assets.values() if a["score"] is not None]
     return {"feed": "crowding", "assets": assets,
             "summary": {"mean_score": round(sum(scored) / len(scored), 1) if scored else None,
-                        "most_crowded_long": max(assets, key=lambda k: assets[k]["score"] if assets[k]["score"] is not None else -999),
-                        "most_crowded_short": min(assets, key=lambda k: assets[k]["score"] if assets[k]["score"] is not None else 999)},
+                        "highest_score_asset": max(assets, key=lambda k: assets[k]["score"] if assets[k]["score"] is not None else -999),
+                        "lowest_score_asset": min(assets, key=lambda k: assets[k]["score"] if assets[k]["score"] is not None else 999)},
             "method": ("score = 100 x clamp(0.5 x funding/60% + 0.3 x log2(retail long/short) + 0.2 x log2(top-trader "
                        "long/short), -1, 1) x (1 + 0.25 x OI-build) , weights renormalised over available inputs. "
                        "Positive = longs crowded. A descriptive indicator from Binance positioning plus Binance, Lighter, "
@@ -1259,11 +1301,11 @@ def build_crowding() -> Dict:
 _PROBES: Dict[str, Callable[[], Any]] = {
     "binance_funding": lambda: _http_get_json("https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT", timeout=6),
     "binance_positioning": lambda: _http_get_json("https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=1h&limit=1", timeout=6),
-    "lighter_funding": lambda: _http_get_json(LIGHTER_API + "/funding-rates", timeout=6),
-    "lighter_orderbook": lambda: _http_get_json(LIGHTER_API + "/orderBookOrders?market_id=1&limit=5", timeout=6),
+    "lighter_funding": lambda: _lighter_get("/funding-rates", timeout=6),
+    "lighter_orderbook": lambda: _lighter_get("/orderBookOrders?market_id=1&limit=5", timeout=6),
     "hyperliquid": lambda: _http_post_json("https://api.hyperliquid.xyz/info", {"type": "l2Book", "coin": "BTC"}, timeout=6),
     "coingecko": lambda: _cg_get("/ping", timeout=6),
-    "defillama": lambda: _http_get_json("https://api.llama.fi/protocols", timeout=8) and True,
+    "defillama": lambda: _http_get_json("https://api.llama.fi/tvl/aave", timeout=8),
     "fear_greed": lambda: _http_get_json("https://api.alternative.me/fng/?limit=1", timeout=6),
     "mempool": lambda: _http_get_json(MEMPOOL_API + "/v1/fees/recommended", timeout=6),
     "base_rpc": lambda: _rpc(BASE_RPC, "eth_blockNumber", [], timeout=6),
@@ -1388,10 +1430,10 @@ FEEDS: List[Dict[str, Any]] = [
      "description": ("One number per asset from -100 (crowded short) to +100 (crowded long) for BTC, ETH, SOL, XRP, "
                      "DOGE and SUI, from funding on Binance, Lighter, Bybit and Hyperliquid, retail and top-trader "
                      "long/short ratios and open-interest build, with every input and any missing input listed. "
-                     "Use as a hard filter against entering crowded trades. A descriptive indicator, not a prediction."),
+                     "A descriptive indicator, not a backtested signal or a prediction."),
      "example": {"feed": "crowding", "assets": {"ETH": {"score": 42.1, "label": "lean_long",
                  "components": {"funding": 0.31, "retail_long_short": 0.52, "top_trader_long_short": 0.2},
-                 "missing": []}}, "summary": {"mean_score": 18.0, "most_crowded_long": "DOGE", "most_crowded_short": "BTC"}}},
+                 "missing": []}}, "summary": {"mean_score": 18.0, "highest_score_asset": "DOGE", "lowest_score_asset": "BTC"}}},
     {"path": "/v1/funding-arb", "key": "funding_arb", "ttl": 60, "tier": "premium", "builder": build_funding_arb,
      "title": "Cross-exchange funding arbitrage",
      "description": ("Perpetual funding for 15 majors on Binance, Bybit and Hyperliquid, normalized to annualized "
@@ -1473,14 +1515,17 @@ _QUOTES: Dict[str, int] = {}
 SELF_WALLETS = {w.strip().lower() for w in os.getenv("PAY_SELF_WALLETS", "").split(",") if w.strip()} | {PAY_TO.lower()}
 MAX_TRACKED_PAYERS = 5000
 MILESTONE_USD = float(os.getenv("PAY_MILESTONE_USD", "20"))
+FORWARDED_USD = float(os.getenv("PAY_FORWARDED_USD", "0"))   # outside revenue already moved to the bot (set by the owner)
+OUTSIDE_FROM = int(os.getenv("PAY_OUTSIDE_FROM_TS", "0"))     # sales before this unix time are treated as own tests
 _SALES: Dict[str, Any] = {"count": 0, "usdc": 0.0, "by_path": {}, "last_ts": None,
-                          "ext_count": 0, "ext_usdc": 0.0, "payers": {}, "self_count": 0, "self_usdc": 0.0, "daily": {}}
+                          "ext_count": 0, "ext_usdc": 0.0, "payers": {}, "self_count": 0, "self_usdc": 0.0, "daily": {},
+                          "unk_count": 0, "unk_usdc": 0.0, "quotes_daily": {}}
 
 
 def _add_sale(rec: Dict[str, Any]) -> None:
     usd = rec.get("usd", 0.0)
     payer = str(rec.get("payer") or "").lower()
-    is_self = bool(payer) and payer in SELF_WALLETS
+    is_self = (bool(payer) and payer in SELF_WALLETS) or (OUTSIDE_FROM and (rec.get("ts") or 0) < OUTSIDE_FROM)
     _SALES["count"] += 1
     _SALES["usdc"] += usd
     bp = _SALES["by_path"].setdefault(rec.get("path", "?"), {"sales": 0, "usdc": 0.0, "external_sales": 0})
@@ -1489,11 +1534,14 @@ def _add_sale(rec: Dict[str, Any]) -> None:
     if is_self:
         _SALES["self_count"] += 1
         _SALES["self_usdc"] += usd
+    elif not payer:  # settlement without a payer address: never counted as outside demand
+        _SALES["unk_count"] += 1
+        _SALES["unk_usdc"] += usd
     else:
         _SALES["ext_count"] += 1
         _SALES["ext_usdc"] += usd
         bp["external_sales"] += 1
-        if payer and (payer in _SALES["payers"] or len(_SALES["payers"]) < MAX_TRACKED_PAYERS):
+        if payer in _SALES["payers"] or len(_SALES["payers"]) < MAX_TRACKED_PAYERS:
             _SALES["payers"][payer] = _SALES["payers"].get(payer, 0) + 1
         day = time.strftime("%Y-%m-%d", time.gmtime(rec.get("ts") or time.time()))
         d = _SALES["daily"].setdefault(day, [0, 0.0])
@@ -1517,8 +1565,13 @@ def _load_sales() -> None:
 
 
 def record_quote(path: str) -> None:
+    day = time.strftime("%Y-%m-%d", time.gmtime())
     with _STATS_LOCK:
         _QUOTES[path] = _QUOTES.get(path, 0) + 1
+        q = _SALES["quotes_daily"]
+        q[day] = q.get(day, 0) + 1
+        for old in sorted(q)[:-60]:
+            del q[old]
 
 
 def record_sale(feed: Dict, settlement: Optional[Dict]) -> None:
@@ -1542,15 +1595,22 @@ def public_stats() -> Dict[str, Any]:
                 "external": {"sales": _SALES["ext_count"], "usdc": round(_SALES["ext_usdc"], 6),
                              "paying_wallets": len(payers),
                              "repeat_wallets": sum(1 for c in payers.values() if c >= 2),
+                             "wallets_short": {(w[:6] + "..." + w[-4:]): c for w, c in list(payers.items())[:20]},
+                             "forwarded_usd": FORWARDED_USD,
+                             "unforwarded_usd": round(max(0.0, _SALES["ext_usdc"] - FORWARDED_USD), 6),
                              "milestone_usd": MILESTONE_USD,
-                             "milestone_reached": _SALES["ext_usdc"] >= MILESTONE_USD,
+                             "milestone_reached": _SALES["ext_usdc"] - FORWARDED_USD >= MILESTONE_USD,
                              "daily_last_30": dict(sorted(_SALES["daily"].items())[-30:])},
                 "own_wallet_sales": {"sales": _SALES["self_count"], "usdc": round(_SALES["self_usdc"], 6)},
+                "unknown_payer_sales": {"sales": _SALES["unk_count"], "usdc": round(_SALES["unk_usdc"], 6)},
+                "quotes_daily_last_30": dict(sorted(_SALES["quotes_daily"].items())[-30:]),
                 "last_sale_ts": _SALES["last_ts"],
                 "sales_by_path": _SALES["by_path"],
                 "quotes_since_start_by_path": dict(_QUOTES),
                 "note": ("quotes = unpaid 402 answers (agents and crawlers checking the price). own_wallet_sales are payments "
-                         "from the receiving wallet itself (test payments); they are not counted as external demand.")}
+                         "from your own listed wallets (PAY_SELF_WALLETS, payTo) or before PAY_OUTSIDE_FROM_TS; unknown_payer_sales have no "
+                         "payer address. Neither counts as outside demand or toward the milestone. quotes include your own and "
+                         "Coinbase's checks, so read them as a trend, not as buyers.")}
 
 
 _load_sales()

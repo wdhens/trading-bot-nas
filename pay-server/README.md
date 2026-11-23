@@ -15,7 +15,7 @@ server never holds a private key. It is stdlib-only Python and runs on a Synolog
 | premium | $0.01 | Lighter funding vs Binance/Bybit/Hyperliquid, cross-venue funding arbitrage, positioning, stablecoin flows, DEX volume, fees, yields, **Lighter and Hyperliquid order-book depth and slippage**, **crowding score** |
 | bundle | $0.02 | regime score |
 
-Every feed returns source and cache age. Nothing here is investment advice, and none of the scores is a
+Every feed returns source and cache age. Slippage is measured against the best price; add half the spread for the mid price. Nothing here is investment advice, and none of the scores is a
 backtested trading signal. Indicative prices and slippage are not guaranteed execution prices.
 
 ## Calling a feed
@@ -39,6 +39,9 @@ Python: see the same quickstart (`pip install "x402[evm,httpx]"`).
 * Status for the owner: `pay-server-STATUS.txt` next to the files on the NAS.
 * Tests: `python3 -m unittest discover -s pay-server/tests` (offline, no network).
 * Environment (set in the Synology task, never in the repo): `PUBLIC_BASE_URL`, `CDP_API_KEY_ID`,
-  `CDP_API_KEY_SECRET`, optional `PAY_SELF_WALLETS` (extra wallets whose payments count as the owner's own tests).
+  `CDP_API_KEY_SECRET`. Optional: `PAY_SELF_WALLETS` (the owner's own paying wallets, comma separated: their test
+  payments are not counted as outside sales), `PAY_FORWARDED_USD` (outside revenue already moved to the bot),
+  `LIGHTER_MAX_PER_MIN` (default 20) and `LIGHTER_QUIET_UTC` (default `00:05-00:30,20:05-21:30`): the trading bot
+  shares the home IP, so Lighter reads stay under a budget and pause while the bot runs.
 
 This server is separate from the trading bot in the same repository: own folder, own task, own updater.

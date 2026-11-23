@@ -295,12 +295,14 @@ def stats_note(st, today):
                 h.get("ok"), h.get("total"), ("; stuk: " + ", ".join(bad)) if bad else "")
     if "external" in s:  # server 3.3+
         e = s["external"]
-        out = "verkopen van anderen: {} (${:.2f}) van {} betalers, {} terugkerend; eigen testbetalingen: {}".format(
+        out = ("verkopen van anderen: {} (${:.2f}) van {} betalers, {} terugkerend; eigen testbetalingen: {}; "
+               "zonder betaleradres: {}").format(
             e.get("sales", 0), e.get("usdc", 0.0), e.get("paying_wallets", 0), e.get("repeat_wallets", 0),
-            s.get("own_wallet_sales", {}).get("sales", 0))
+            s.get("own_wallet_sales", {}).get("sales", 0), s.get("unknown_payer_sales", {}).get("sales", 0))
         if e.get("milestone_reached"):
-            out += "\nMIJLPAAL: ${:g} van anderen verdiend. Vraag Claude om door te storten naar de bot (jij keurt goed).".format(
-                e.get("milestone_usd", 20))
+            out += ("\nMIJLPAAL: nog ${:.2f} van anderen niet doorgestort. Controleer eerst of de betalers (zie /v1/stats) "
+                    "niet jouw eigen wallets zijn. Vraag Claude om door te storten naar de bot (jij keurt goed).").format(
+                e.get("unforwarded_usd", 0.0))
         return out
     return "verkopen: {} (${:.2f}) van {} betalers".format(
         s.get("sales_total", 0), s.get("usdc_total", 0.0), s.get("unique_payers", 0))
