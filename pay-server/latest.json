@@ -1,13 +1,13 @@
 {
- "version": "pay-20261120-2230",
+ "version": "pay-20261123-1900",
  "files": {
   "nas_pay_server.py": {
-   "url": "https://raw.githubusercontent.com/wdhens/trading-bot-nas/main/pay-server/releases/pay-20261120-2230/nas_pay_server.py",
-   "sha256": "bec842ccd5aefec6e3a01d6e4ba58068f6962e2f280887ab274e40286c8ca682"
+   "url": "https://raw.githubusercontent.com/wdhens/trading-bot-nas/main/pay-server/releases/pay-20261123-1900/nas_pay_server.py",
+   "sha256": "046c0fc4dafae3bd1c5da3b9a5c9d4cd9a1d9a9f6b68bcf367b2a24bf68fa012"
   },
   "pay_tick.py": {
-   "url": "https://raw.githubusercontent.com/wdhens/trading-bot-nas/main/pay-server/releases/pay-20261120-2230/pay_tick.py",
-   "sha256": "66426084bb2b7f755bdbd549192dcc39d84496b70b8f05f3edebc72fdc4a2d08"
+   "url": "https://raw.githubusercontent.com/wdhens/trading-bot-nas/main/pay-server/releases/pay-20261123-1900/pay_tick.py",
+   "sha256": "6d7a8cfe0e4b0a8595e4cc48992e01ba666cfcae858a25b27d99ffbe411b5b79"
   }
  }
 }

@@ -287,6 +287,21 @@ def stats_note(st, today):
         st["last_history"] = today
         with open(HISTORY, "a") as f:
             f.write(json.dumps({"date": today, "stats": s}, separators=(",", ":")) + "\n")
+        c2, _, b2 = get("http://127.0.0.1:{}/v1/source-health".format(PORT), timeout=30)
+        if c2 == 200:
+            h = json.loads(b2)
+            bad = [k for k, v in h.get("sources", {}).items() if not v.get("ok")]
+            st["last_sources"] = "databronnen: {}/{} bereikbaar{}".format(
+                h.get("ok"), h.get("total"), ("; stuk: " + ", ".join(bad)) if bad else "")
+    if "external" in s:  # server 3.3+
+        e = s["external"]
+        out = "verkopen van anderen: {} (${:.2f}) van {} betalers, {} terugkerend; eigen testbetalingen: {}".format(
+            e.get("sales", 0), e.get("usdc", 0.0), e.get("paying_wallets", 0), e.get("repeat_wallets", 0),
+            s.get("own_wallet_sales", {}).get("sales", 0))
+        if e.get("milestone_reached"):
+            out += "\nMIJLPAAL: ${:g} van anderen verdiend. Vraag Claude om door te storten naar de bot (jij keurt goed).".format(
+                e.get("milestone_usd", 20))
+        return out
     return "verkopen: {} (${:.2f}) van {} betalers".format(
         s.get("sales_total", 0), s.get("usdc_total", 0.0), s.get("unique_payers", 0))
 
@@ -330,7 +345,7 @@ def main():
         last = st.get("last_update_msg", "")
         out = [x for x in lines if x != last] + [last,
                "nu: " + ("online, versie {}".format(h.get("version")) if h else "OFFLINE"),
-               "bereikbaar (30 dagen): {}%".format(up), sales, st.get("last_listing", "")]
+               "bereikbaar (30 dagen): {}%".format(up), sales, st.get("last_sources", ""), st.get("last_listing", "")]
         status([x for x in out if x])
 
 
