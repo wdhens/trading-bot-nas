@@ -49,7 +49,7 @@ def pay_one(acct, path, requirement_json, accept):
                "payload": {"signature": sig, "authorization": auth}, "resource": requirement_json["resource"]}
     hdr = base64.b64encode(json.dumps(payload).encode()).decode()
     r = requests.get(BASE + path, headers={"PAYMENT-SIGNATURE": hdr}, timeout=60)
-    return r.status_code, r.headers.get("payment-response", ""), r.text[:160]
+    return r.status_code, r.headers.get("payment-response", ""), r.text[:900]
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--send", action="store_true"); a = ap.parse_args()
