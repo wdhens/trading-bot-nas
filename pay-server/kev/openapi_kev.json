@@ -1,0 +1,155 @@
+{
+ "/v1/kev": {
+  "get": {
+   "operationId": "kev_check_cve",
+   "summary": "Known exploited vulnerability check",
+   "description": "Is this CVE known to be exploited in the wild? Returns whether it is in the CISA KEV catalog, date added, CISA due date, required action and known ransomware use. Parameter: cve=CVE-YYYY-NNNN. Source: CISA Known Exploited Vulnerabilities catalog (CC0), refreshed daily. Absence from KEV is not proof of safety. Not endorsed by CISA.",
+   "tags": [
+    "security",
+    "vulnerability",
+    "cisa",
+    "kev"
+   ],
+   "parameters": [
+    {
+     "name": "cve",
+     "in": "query",
+     "required": true,
+     "description": "CVE id",
+     "schema": {
+      "type": "string",
+      "pattern": "^CVE-\\d{4}-\\d{4,7}$"
+     }
+    }
+   ],
+   "x-payment-info": {
+    "protocol": "x402",
+    "scheme": "exact",
+    "network": "eip155:8453",
+    "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "amount": "5000",
+    "price_usd": 0.005,
+    "payTo": "0xC9eebecb1d0AfF4fb2B9978516E075A33639892C"
+   },
+   "responses": {
+    "200": {
+     "description": "Lookup result (payment settled)",
+     "content": {
+      "application/json": {
+       "example": {
+        "query": "CVE-2021-44228",
+        "known_exploited": true,
+        "entry": {
+         "cveID": "CVE-2021-44228",
+         "vendorProject": "Apache",
+         "product": "Log4j2",
+         "dateAdded": "2021-12-10",
+         "dueDate": "2021-12-24",
+         "knownRansomwareCampaignUse": "Known"
+        }
+       }
+      }
+     }
+    },
+    "400": {
+     "description": "Invalid parameters. Free: no payment requested."
+    },
+    "402": {
+     "description": "Payment required (x402 v2, PAYMENT-REQUIRED header)."
+    },
+    "503": {
+     "description": "Catalog unavailable or stale. Not charged."
+    }
+   }
+  }
+ },
+ "/v1/kev/search": {
+  "get": {
+   "operationId": "kev_search",
+   "summary": "Known exploited vulnerabilities by vendor/product",
+   "description": "All CISA KEV entries for a vendor and/or product (2-64 chars), each labelled exact/word/substring match, newest first, with dueDate, requiredAction and ransomware use. Parameters: vendor, product, min_quality (exact|word|substring, default word), limit (1-100). Source: CISA Known Exploited Vulnerabilities catalog (CC0), refreshed daily. Absence from KEV is not proof of safety. Not endorsed by CISA.",
+   "tags": [
+    "security",
+    "vulnerability",
+    "cisa",
+    "kev"
+   ],
+   "parameters": [
+    {
+     "name": "vendor",
+     "in": "query",
+     "required": false,
+     "description": "Vendor name (vendor and/or product required)",
+     "schema": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9 .\\-]+$"
+     }
+    },
+    {
+     "name": "product",
+     "in": "query",
+     "required": false,
+     "description": "Product name",
+     "schema": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9 .\\-]+$"
+     }
+    },
+    {
+     "name": "min_quality",
+     "in": "query",
+     "required": false,
+     "description": "exact|word|substring",
+     "schema": {
+      "type": "string",
+      "enum": [
+       "exact",
+       "word",
+       "substring"
+      ],
+      "default": "word"
+     }
+    },
+    {
+     "name": "limit",
+     "in": "query",
+     "required": false,
+     "description": "1-100",
+     "schema": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "default": 25
+     }
+    }
+   ],
+   "x-payment-info": {
+    "protocol": "x402",
+    "scheme": "exact",
+    "network": "eip155:8453",
+    "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "amount": "10000",
+    "price_usd": 0.01,
+    "payTo": "0xC9eebecb1d0AfF4fb2B9978516E075A33639892C"
+   },
+   "responses": {
+    "200": {
+     "description": "Lookup result (payment settled)"
+    },
+    "400": {
+     "description": "Invalid parameters. Free: no payment requested."
+    },
+    "402": {
+     "description": "Payment required (x402 v2, PAYMENT-REQUIRED header)."
+    },
+    "503": {
+     "description": "Catalog unavailable or stale. Not charged."
+    }
+   }
+  }
+ }
+}

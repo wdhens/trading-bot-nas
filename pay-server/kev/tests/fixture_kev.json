@@ -1,0 +1,17 @@
+{
+ "title": "CISA Catalog of Known Exploited Vulnerabilities (TEST FIXTURE - not real catalog data)",
+ "catalogVersion": "2099.01.01",
+ "dateReleased": "2099-01-01T12:00:00.0000Z",
+ "count": 9,
+ "vulnerabilities": [
+  {"cveID": "CVE-2021-44228", "vendorProject": "Apache", "product": "Log4j2", "vulnerabilityName": "Fixture: Apache Log4j2 RCE", "dateAdded": "2021-12-10", "shortDescription": "fixture", "requiredAction": "Apply updates per vendor instructions.", "dueDate": "2021-12-24", "knownRansomwareCampaignUse": "Known", "notes": "", "cwes": ["CWE-917"]},
+  {"cveID": "CVE-2021-41773", "vendorProject": "Apache", "product": "HTTP Server", "vulnerabilityName": "Fixture: Apache HTTP Server path traversal", "dateAdded": "2021-11-03", "shortDescription": "fixture", "requiredAction": "Apply updates per vendor instructions.", "dueDate": "2021-11-17", "knownRansomwareCampaignUse": "Unknown", "notes": "", "cwes": []},
+  {"cveID": "CVE-2023-20198", "vendorProject": "Cisco", "product": "IOS XE", "vulnerabilityName": "Fixture: Cisco IOS XE web UI", "dateAdded": "2023-10-16", "shortDescription": "fixture", "requiredAction": "Apply mitigations.", "dueDate": "2023-10-20", "knownRansomwareCampaignUse": "Unknown", "notes": "", "cwes": []},
+  {"cveID": "CVE-2018-0171", "vendorProject": "Cisco", "product": "IOS", "vulnerabilityName": "Fixture: Cisco IOS Smart Install", "dateAdded": "2021-11-03", "shortDescription": "fixture", "requiredAction": "Apply updates per vendor instructions.", "dueDate": "2022-05-03", "knownRansomwareCampaignUse": "Unknown", "notes": "", "cwes": []},
+  {"cveID": "CVE-2023-4863", "vendorProject": "Google", "product": "Chromium WebP", "vulnerabilityName": "Fixture: Chromium WebP heap overflow", "dateAdded": "2023-09-13", "shortDescription": "fixture", "requiredAction": "Apply updates per vendor instructions.", "dueDate": "2023-10-04", "knownRansomwareCampaignUse": "Unknown", "notes": "", "cwes": []},
+  {"cveID": "CVE-2020-25213", "vendorProject": "WordPress", "product": "File Manager Plugin", "vulnerabilityName": "Fixture: WP File Manager upload", "dateAdded": "2021-11-03", "shortDescription": "fixture", "requiredAction": "Apply updates per vendor instructions.", "dueDate": "2022-05-03", "knownRansomwareCampaignUse": "Unknown", "notes": "", "cwes": []},
+  {"cveID": "CVE-2020-25078", "vendorProject": "D-Link", "product": "DCS-2530L and DCS-2670L Devices", "vulnerabilityName": "Fixture: D-Link camera disclosure", "dateAdded": "2022-05-23", "shortDescription": "fixture", "requiredAction": "Apply updates per vendor instructions.", "dueDate": "2022-06-13", "knownRansomwareCampaignUse": "Unknown", "notes": "", "cwes": []},
+  {"cveID": "CVE-2019-5418", "vendorProject": "Rails", "product": "Ruby on Rails", "vulnerabilityName": "Fixture: Rails file disclosure", "dateAdded": "2022-03-25", "shortDescription": "fixture", "requiredAction": "Apply updates per vendor instructions.", "dueDate": "2022-04-15", "knownRansomwareCampaignUse": "Unknown", "notes": "", "cwes": []},
+  {"cveID": "CVE-2017-9805", "vendorProject": "Ubiquiti", "product": "EdgeRouter", "vulnerabilityName": "Fixture: EdgeRouter command injection", "dateAdded": "2022-03-28", "shortDescription": "fixture", "requiredAction": "Apply updates per vendor instructions.", "dueDate": "2022-04-18", "knownRansomwareCampaignUse": "Unknown", "notes": "", "cwes": []}
+ ]
+}
