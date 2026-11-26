@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash deploy/daily.sh)",
+      "Bash(python3 -m intel *)",
+      "Bash(pip install -q -r requirements.txt)"
+    ]
+  }
+}
