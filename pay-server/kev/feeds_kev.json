@@ -1,0 +1,36 @@
+[
+ {
+  "path": "/v1/kev",
+  "url": "https://strawberryking.synology.me/v1/kev?cve=CVE-2021-44228",
+  "title": "Known exploited vulnerability check",
+  "tier": "basic",
+  "price_usdc_atomic": "5000",
+  "price_usd": 0.005,
+  "network": "eip155:8453",
+  "cache_ttl_sec": 3600,
+  "tags": [
+   "security",
+   "vulnerability",
+   "cisa",
+   "kev"
+  ],
+  "description": "Is this CVE known to be exploited in the wild? Returns whether it is in the CISA KEV catalog, date added, CISA due date, required action and known ransomware use. Parameter: cve=CVE-YYYY-NNNN. Source: CISA Known Exploited Vulnerabilities catalog (CC0), refreshed daily. Absence from KEV is not proof of safety. Not endorsed by CISA."
+ },
+ {
+  "path": "/v1/kev/search",
+  "url": "https://strawberryking.synology.me/v1/kev/search?vendor=cisco&product=ios",
+  "title": "Known exploited vulnerabilities by vendor/product",
+  "tier": "premium",
+  "price_usdc_atomic": "10000",
+  "price_usd": 0.01,
+  "network": "eip155:8453",
+  "cache_ttl_sec": 3600,
+  "tags": [
+   "security",
+   "vulnerability",
+   "cisa",
+   "kev"
+  ],
+  "description": "All CISA KEV entries for a vendor and/or product (2-64 chars), each labelled exact/word/substring match, newest first, with dueDate, requiredAction and ransomware use. Parameters: vendor, product, min_quality (exact|word|substring, default word), limit (1-100). Source: CISA Known Exploited Vulnerabilities catalog (CC0), refreshed daily. Absence from KEV is not proof of safety. Not endorsed by CISA."
+ }
+]

@@ -1,0 +1,25 @@
+{
+ "source": "public GET https://strawberryking.synology.me/v1/feeds and /v1/stats on 2026-11-25 (read-only, before this package)",
+ "count": 19,
+ "feeds": [
+  {"path": "/v1/signal", "tier": "basic", "price_usdc_atomic": "5000"},
+  {"path": "/v1/funding", "tier": "basic", "price_usdc_atomic": "5000"},
+  {"path": "/v1/fear-greed", "tier": "basic", "price_usdc_atomic": "5000"},
+  {"path": "/v1/defi", "tier": "basic", "price_usdc_atomic": "5000"},
+  {"path": "/v1/global", "tier": "basic", "price_usdc_atomic": "5000"},
+  {"path": "/v1/gas-pulse", "tier": "basic", "price_usdc_atomic": "5000"},
+  {"path": "/v1/btc-network", "tier": "basic", "price_usdc_atomic": "5000"},
+  {"path": "/v1/trending", "tier": "basic", "price_usdc_atomic": "5000"},
+  {"path": "/v1/lighter-markets", "tier": "basic", "price_usdc_atomic": "5000"},
+  {"path": "/v1/lighter-funding", "tier": "premium", "price_usdc_atomic": "10000"},
+  {"path": "/v1/lighter-depth", "tier": "premium", "price_usdc_atomic": "10000"},
+  {"path": "/v1/crowding", "tier": "premium", "price_usdc_atomic": "10000"},
+  {"path": "/v1/funding-arb", "tier": "premium", "price_usdc_atomic": "10000"},
+  {"path": "/v1/positioning", "tier": "premium", "price_usdc_atomic": "10000"},
+  {"path": "/v1/stablecoins", "tier": "premium", "price_usdc_atomic": "10000"},
+  {"path": "/v1/dex-volume", "tier": "premium", "price_usdc_atomic": "10000"},
+  {"path": "/v1/fees", "tier": "premium", "price_usdc_atomic": "10000"},
+  {"path": "/v1/yields", "tier": "premium", "price_usdc_atomic": "10000"},
+  {"path": "/v1/regime", "tier": "bundle", "price_usdc_atomic": "20000"}
+ ]
+}
